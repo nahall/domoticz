@@ -27,6 +27,7 @@ enum _eSwitchType
 	STYPE_Media,					//17
 	STYPE_Selector,					//18
 	STYPE_DoorLock,					//19
+	STYPE_DoorLockInverted,					//20
 	STYPE_END
 };
 
@@ -57,6 +58,20 @@ enum _eTimerType
 	TTYPE_MONTHLY_WD,
 	TTYPE_YEARLY,
 	TTYPE_YEARLY_WD,
+	TTYPE_BEFORESUNATSOUTH,
+	TTYPE_AFTERSUNATSOUTH,
+	TTYPE_BEFORECIVTWSTART,
+	TTYPE_AFTERCIVTWSTART,
+	TTYPE_BEFORECIVTWEND,
+	TTYPE_AFTERCIVTWEND,
+	TTYPE_BEFORENAUTTWSTART,
+	TTYPE_AFTERNAUTTWSTART,
+	TTYPE_BEFORENAUTTWEND,
+	TTYPE_AFTERNAUTTWEND,
+	TTYPE_BEFOREASTTWSTART,
+	TTYPE_AFTERASTTWSTART,
+	TTYPE_BEFOREASTTWEND,
+	TTYPE_AFTERASTTWEND,
 	TTYPE_END
 };
 
@@ -82,7 +97,7 @@ enum _eMediaStatus
 };
 
 enum _eHardwareTypes {
-	HTYPE_RFXtrx315 = 0,			//0
+	HTYPE_RFXtrx315 = 0,		//0
 	HTYPE_RFXtrx433,			//1
 	HTYPE_RFXLAN,				//2
 	HTYPE_Domoticz,				//3
@@ -91,7 +106,7 @@ enum _eHardwareTypes {
 	HTYPE_YouLess,				//6
 	HTYPE_TE923,				//7
 	HTYPE_Rego6XX,				//8
-	HTYPE_RazberryZWave,		//9
+	HTYPE_FreeToUse,			//9
 	HTYPE_DavisVantage,			//10
 	HTYPE_VOLCRAFTCO20,			//11
 	HTYPE_1WIRE,				//12
@@ -189,6 +204,16 @@ enum _eHardwareTypes {
 	HTYPE_OnkyoAVTCP,			//104
 	HTYPE_DenkoviSmartdenIPInOut,	//105
 	HTYPE_EVOHOME_TCP,			//106
+	HTYPE_USBtinGateway,		//107
+	HTYPE_EnphaseAPI,			//108
+	HTYPE_RaspberryMCP23017,	//109
+	HTYPE_eHouseTCP,			//110
+	HTYPE_Comm5SMTCP,			//111
+	HTYPE_Nest_OAuthAPI,		//112
+	HTYPE_EcoCompteur,			//113
+	HTYPE_Honeywell,			//114
+	HTYPE_Tado,					//115
+	HTYPE_DenkoviDevices,		//116
 	HTYPE_END
 };
 
@@ -277,4 +302,5 @@ bool GetLightCommand(
 bool IsLightSwitchOn(const std::string &lstatus);
 
 bool IsSerialDevice(const _eHardwareTypes htype);
+bool IsNetworkDevice(const _eHardwareTypes htype);
 void ConvertToGeneralSwitchType(std::string &devid, int &dtype, int &subtype);

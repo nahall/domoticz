@@ -31,8 +31,8 @@ bool RFXComTCP::StartHardware()
 	m_bIsStarted=true;
 	m_rxbufferpos=0;
 	//Start worker thread
-	m_thread = boost::shared_ptr<boost::thread>(new boost::thread(boost::bind(&RFXComTCP::Do_Work, this)));
-	return (m_thread!=NULL);
+	m_thread = std::make_shared<std::thread>(&RFXComTCP::Do_Work, this);
+	return (m_thread != nullptr);
 }
 
 bool RFXComTCP::StopHardware()
@@ -43,7 +43,7 @@ bool RFXComTCP::StopHardware()
 		try {
 			disconnect();
 			close();
-			if (m_thread != NULL)
+			if (m_thread)
 			{
 				m_thread->join();
 				m_thread.reset();
@@ -61,7 +61,7 @@ bool RFXComTCP::StopHardware()
 
 void RFXComTCP::OnConnect()
 {
-	_log.Log(LOG_STATUS, "RFXCOM: connected to: %s:%ld", m_szIPAddress.c_str(), m_usIPPort);
+	_log.Log(LOG_STATUS, "RFXCOM: connected to: %s:%d", m_szIPAddress.c_str(), m_usIPPort);
 	m_bIsStarted = true;
 
 	sOnConnected(this);
@@ -94,11 +94,11 @@ void RFXComTCP::Do_Work()
 		}
 	}
 	_log.Log(LOG_STATUS,"RFXCOM: TCP/IP Worker stopped...");
-} 
+}
 
 void RFXComTCP::OnData(const unsigned char *pData, size_t length)
 {
-	boost::lock_guard<boost::mutex> l(readQueueMutex);
+	std::lock_guard<std::mutex> l(readQueueMutex);
 	onInternalMessage(pData, length);
 }
 
@@ -117,7 +117,7 @@ void RFXComTCP::OnError(const boost::system::error_code& error)
 		(error == boost::asio::error::timed_out)
 		)
 	{
-		_log.Log(LOG_ERROR, "RFXCOM: Can not connect to: %s:%ld", m_szIPAddress.c_str(), m_usIPPort);
+		_log.Log(LOG_ERROR, "RFXCOM: Can not connect to: %s:%d", m_szIPAddress.c_str(), m_usIPPort);
 	}
 	else if (
 		(error == boost::asio::error::eof) ||

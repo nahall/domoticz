@@ -28,8 +28,6 @@
 	#include <limits>
 	#include <sys/time.h>
 	#include <unistd.h>
-	#include <vector>
-	#include <map>
 
 	struct _tDUsageStruct
 	{
@@ -72,7 +70,6 @@ extern std::string szInternalVoltageCommand;
 extern bool bHasInternalCurrent;
 extern std::string szInternalCurrentCommand;
 
-
 #define round(a) ( int ) ( a + .5 )
 
 CHardwareMonitor::CHardwareMonitor(const int ID)
@@ -80,11 +77,15 @@ CHardwareMonitor::CHardwareMonitor(const int ID)
 	m_HwdID = ID;
 	m_stoprequested=false;
 	m_bOutputLog = false;
+	m_lastquerytime = 0;
+#if defined (__linux__) || defined(__CYGWIN32__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+	m_totcpu = 0;
+	m_lastloadcpu = 0;
+#endif
 #ifdef WIN32
 	m_pLocator = NULL;
 	m_pServicesOHM = NULL;
 	m_pServicesSystem = NULL;
-	m_lastquerytime = 0;
 	//	CoInitializeEx(0, COINIT_MULTITHREADED);
 //	CoInitializeSecurity(NULL, -1, NULL, NULL, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE, NULL);
 #endif
@@ -112,7 +113,7 @@ bool CHardwareMonitor::StartHardware()
 #endif
 	m_stoprequested = false;
 	m_lastquerytime = 0;
-	m_thread = boost::shared_ptr<boost::thread>(new boost::thread(boost::bind(&CHardwareMonitor::Do_Work, this)));
+	m_thread = std::make_shared<std::thread>(&CHardwareMonitor::Do_Work, this);
 	m_bIsStarted = true;
 	sOnConnected(this);
 #if defined(__linux__) || defined(__CYGWIN32__) || defined(__FreeBSD__) || defined(__OpenBSD__)
@@ -128,7 +129,7 @@ bool CHardwareMonitor::StartHardware()
 
 bool CHardwareMonitor::StopHardware()
 {
-	if (m_thread!=NULL)
+	if (m_thread)
 	{
 		m_stoprequested = true;
 		m_thread->join();
@@ -167,7 +168,7 @@ void CHardwareMonitor::Do_Work()
 				}
 				catch (...)
 				{
-					_log.Log(LOG_STATUS, "Hardware Monitor: Error occurred while Fetching motherboard sensors!...");
+					_log.Log(LOG_ERROR, "Hardware Monitor: Error occurred while Fetching motherboard sensors!...");
 				}
 			}
 
@@ -180,7 +181,7 @@ void CHardwareMonitor::Do_Work()
 				}
 				catch (...)
 				{
-					_log.Log(LOG_STATUS, "Hardware Monitor: Error occurred while Fetching CPU data!...");
+					_log.Log(LOG_ERROR, "Hardware Monitor: Error occurred while Fetching CPU data!...");
 				}
 			}
 
@@ -192,7 +193,7 @@ void CHardwareMonitor::Do_Work()
 				}
 				catch (...)
 				{
-					_log.Log(LOG_STATUS, "Hardware Monitor: Error occurred while Fetching memory data!...");
+					_log.Log(LOG_ERROR, "Hardware Monitor: Error occurred while Fetching memory data!...");
 				}
 			}
 
@@ -204,7 +205,7 @@ void CHardwareMonitor::Do_Work()
 				}
 				catch (...)
 				{
-					_log.Log(LOG_STATUS, "Hardware Monitor: Error occurred while Fetching disk data!...");
+					_log.Log(LOG_ERROR, "Hardware Monitor: Error occurred while Fetching disk data!...");
 				}
 			}
 #endif
@@ -359,7 +360,7 @@ void CHardwareMonitor::UpdateSystemSensor(const std::string& qType, const int di
 	{
 		doffset = 1300;
 		float volt = static_cast<float>(atof(devValue.c_str()));
-		SendVoltageSensor(0, doffset + dindex, 255, volt, devName);
+		SendVoltageSensor(0, (uint8_t)(doffset + dindex), 255, volt, devName);
 	}
 	else if (qType == "Current")
 	{
@@ -367,6 +368,14 @@ void CHardwareMonitor::UpdateSystemSensor(const std::string& qType, const int di
 		float curr = static_cast<float>(atof(devValue.c_str()));
 		SendCurrent(doffset + dindex, curr, devName);
 	}
+#if defined (__linux__)
+	else if (qType == "Process")
+	{
+		doffset = 1500;
+		float usage = static_cast<float>(atof(devValue.c_str()));
+		SendCustomSensor(0, doffset + dindex, 255, usage, devName, "MB");
+	}
+#endif
 	return;
 }
 
@@ -459,7 +468,6 @@ void CHardwareMonitor::RunWMIQuery(const char* qTable, const std::string &qType)
 	if ((m_pServicesOHM == NULL) || (m_pServicesSystem == NULL))
 		return;
 	HRESULT hr;
-	int dindex = 0;
 	std::string query = "SELECT * FROM ";
 	query.append(qTable);
 	query.append(" WHERE SensorType = '");
@@ -469,12 +477,14 @@ void CHardwareMonitor::RunWMIQuery(const char* qTable, const std::string &qType)
 	hr = m_pServicesOHM->ExecQuery(L"WQL", bstr_t(query.c_str()), WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, NULL, &pEnumerator);
 	if (!FAILED(hr))
 	{
+		int dindex = 0;
+
 		// Get the data from the query
 		IWbemClassObject *pclsObj = NULL;
 		while (pEnumerator)
 		{
 			ULONG uReturn = 0;
-			HRESULT hr = pEnumerator->Next(WBEM_INFINITE, 1, &pclsObj, &uReturn);
+			hr = pEnumerator->Next(WBEM_INFINITE, 1, &pclsObj, &uReturn);
 			if (FAILED(hr) || (0 == uReturn))
 			{
 				break;
@@ -531,6 +541,32 @@ void CHardwareMonitor::RunWMIQuery(const char* qTable, const std::string &qType)
 		return ((double) (tp.tv_sec)) +
 			(((double) tp.tv_usec) * 0.000001 );
 	}
+
+#if defined(__linux__)
+	float CHardwareMonitor::GetProcessMemUsage()
+	{
+		pid_t pid = getpid();
+		std::stringstream ssPidfile;
+		ssPidfile << "/proc/" << pid << "/status";
+		std::ifstream mfile(ssPidfile.str().c_str());
+		if (!mfile.is_open())
+			return -1;
+		uint32_t VmRSS = -1;
+		uint32_t VmSwap = -1;
+		std::string token;
+		while (mfile >> token)
+		{
+			if (token == "VmRSS:")
+				mfile >> VmRSS;
+			else if (token == "VmSwap:")
+				mfile >> VmSwap;
+
+			// ignore rest of the line
+			mfile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		}
+		return (VmRSS + VmSwap) / 1000.f;
+	}
+#endif
 
 	float GetMemUsageLinux()
 	{
@@ -629,12 +665,20 @@ void CHardwareMonitor::RunWMIQuery(const char* qTable, const std::string &qType)
 #endif
 		sprintf(szTmp,"%.2f",memusedpercentage);
 		UpdateSystemSensor("Load", 0, "Memory Usage", szTmp);
+#ifdef __linux__
+		float memProcess = GetProcessMemUsage();
+		if (memProcess != -1)
+		{
+			sprintf(szTmp, "%.2f", memProcess);
+			UpdateSystemSensor("Process", 0, "Process Usage", szTmp);
+		}
+#endif
 	}
 
 	void CHardwareMonitor::FetchUnixCPU()
 	{
-		char szTmp[300];
 		//CPU
+		char szTmp[300];
 		char cname[50];
 		if (m_lastquerytime==0)
 		{
@@ -752,14 +796,13 @@ void CHardwareMonitor::RunWMIQuery(const char* qTable, const std::string &qType)
 		std::vector<std::string> _rlines=ExecuteCommandAndReturn(m_dfcommand, returncode);
 		if (!_rlines.empty())
 		{
-			std::vector<std::string>::const_iterator ittDF;
-			for (ittDF = _rlines.begin(); ittDF != _rlines.end(); ++ittDF)
+			for (const auto & ittDF : _rlines)
 			{
 				char dname[200];
 				char suse[30];
 				char smountpoint[300];
 				long numblock, usedblocks, availblocks;
-				int ret = sscanf((*ittDF).c_str(), "%s\t%ld\t%ld\t%ld\t%s\t%s\n", dname, &numblock, &usedblocks, &availblocks, suse, smountpoint);
+				int ret = sscanf(ittDF.c_str(), "%s\t%ld\t%ld\t%ld\t%s\t%s\n", dname, &numblock, &usedblocks, &availblocks, suse, smountpoint);
 				if (ret == 6)
 				{
 					std::map<std::string, std::string>::iterator it = _dmounts_.find(dname);
@@ -787,14 +830,13 @@ void CHardwareMonitor::RunWMIQuery(const char* qTable, const std::string &qType)
 				}
 			}
 			int dindex = 0;
-			std::map<std::string, _tDUsageStruct>::const_iterator ittDisks;
-			for (ittDisks = _disks.begin(); ittDisks != _disks.end(); ++ittDisks)
+			for (const auto & ittDisks : _disks)
 			{
-				_tDUsageStruct dusage = (*ittDisks).second;
+				_tDUsageStruct dusage = ittDisks.second;
 				if (dusage.TotalBlocks > 0)
 				{
 					double UsagedPercentage = (100 / double(dusage.TotalBlocks))*double(dusage.UsedBlocks);
-					//std::cout << "Disk: " << (*ittDisks).first << ", Mount: " << dusage.MountPoint << ", Used: " << UsagedPercentage << std::endl;
+					//std::cout << "Disk: " << ittDisks.first << ", Mount: " << dusage.MountPoint << ", Used: " << UsagedPercentage << std::endl;
 					char szTmp[300];
 					sprintf(szTmp, "%.2f", UsagedPercentage);
 					std::string hddname = "HDD " + dusage.MountPoint;

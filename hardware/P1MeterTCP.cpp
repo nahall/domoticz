@@ -58,8 +58,8 @@ bool P1MeterTCP::StartHardware()
 	m_bIsStarted=true;
 
 	//Start worker thread
-	m_thread = boost::shared_ptr<boost::thread>(new boost::thread(boost::bind(&P1MeterTCP::Do_Work, this)));
-	return (m_thread!=NULL);
+	m_thread = std::make_shared<std::thread>(&P1MeterTCP::Do_Work, this);
+	return (m_thread != nullptr);
 }
 
 bool P1MeterTCP::StopHardware()
@@ -93,11 +93,11 @@ bool P1MeterTCP::ConnectInternal()
 	{
 		closesocket(m_socket);
 		m_socket=INVALID_SOCKET;
-		_log.Log(LOG_ERROR,"P1 Smart Meter: could not connect to: %s:%ld",m_szIPAddress.c_str(),m_usIPPort);
+		_log.Log(LOG_ERROR,"P1 Smart Meter: could not connect to: %s:%d",m_szIPAddress.c_str(),m_usIPPort);
 		return false;
 	}
 
-	_log.Log(LOG_STATUS,"P1 Smart Meter: connected to: %s:%ld", m_szIPAddress.c_str(), m_usIPPort);
+	_log.Log(LOG_STATUS,"P1 Smart Meter: connected to: %s:%d", m_szIPAddress.c_str(), m_usIPPort);
 
 	if (m_bDisableCRC) {
 		_log.Log(LOG_STATUS,"P1 Smart Meter: CRC validation disabled through hardware control");
@@ -167,7 +167,7 @@ void P1MeterTCP::Do_Work()
 			}
 			else
 			{
-				boost::lock_guard<boost::mutex> l(readQueueMutex);
+				std::lock_guard<std::mutex> l(readQueueMutex);
 				ParseData((const unsigned char*)&data, bread, m_bDisableCRC, m_ratelimit);
 			}
 		}

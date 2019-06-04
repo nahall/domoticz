@@ -12,6 +12,7 @@ local deviceAdapters = {
 	'electric_usage_device',
 	'evohome_device',
 	'gas_device',
+	'generic_device',
 	'group_device',
 	'humidity_device',
 	'kwh_device',
@@ -133,15 +134,6 @@ local function DeviceAdapters(dummyLogger)
 		end
 	end
 
-	function self.round(num, numDecimalPlaces)
-		if (num == nil) then
-			--print(debug.traceback())
-			num = 0
-		end
-		local mult = 10 ^ (numDecimalPlaces or 0)
-		return math.floor(num * mult + 0.5) / mult
-	end
-
 	self.states = {
 		on = { b = true, inv = 'Off' },
 		open = { b = true, inv = 'Off' },
@@ -170,6 +162,7 @@ local function DeviceAdapters(dummyLogger)
 		['nightmode'] = { b = true, inv = 'Off' },
 		['set to white'] = { b = true, inv = 'Off' },
 		['set kelvin level'] = { b = true, inv = 'Off' },
+		['set color'] = { b = true },
 	}
 
 	return self

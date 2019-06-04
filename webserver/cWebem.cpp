@@ -6,9 +6,6 @@
 #include "stdafx.h"
 #include "cWebem.h"
 #include <boost/bind.hpp>
-#include <boost/uuid/uuid.hpp>            // uuid class
-#include <boost/uuid/uuid_generators.hpp> // uuid generators
-#include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 #include "reply.hpp"
 #include "request.hpp"
 #include "mime_types.hpp"
@@ -19,6 +16,7 @@
 #include <stdarg.h>
 #include <fstream>
 #include <sstream>
+#include <cstdlib>
 #include "../main/Helper.h"
 #include "../main/localtime_r.h"
 #include "../main/Logger.h"
@@ -51,12 +49,13 @@ namespace http {
 			myRequestHandler(doc_root, this),
 			m_DigistRealm("Domoticz.com"),
 			m_session_clean_timer(m_io_service, boost::posix_time::minutes(1)),
-			m_io_service_thread(std::make_shared<std::thread>(boost::bind(&boost::asio::io_service::run, &m_io_service))),
 			m_sessions(), // Rene, make sure we initialize m_sessions first, before starting a server
 			myServer(server_factory::create(settings, myRequestHandler))
 		{
 			// associate handler to timer and schedule the first iteration
 			m_session_clean_timer.async_wait(boost::bind(&cWebem::CleanSessions, this));
+			m_io_service_thread = std::make_shared<std::thread>(boost::bind(&boost::asio::io_service::run, &m_io_service));
+			SetThreadName(m_io_service_thread->native_handle(), "Webem_ssncleaner");
 		}
 
 		cWebem::~cWebem()
@@ -1321,7 +1320,7 @@ namespace http {
 		void cWebemRequestHandler::send_remove_cookie(reply& rep)
 		{
 			std::stringstream sstr;
-			sstr << "SID=none";
+			sstr << "DMZSID=none";
 			// RK, we removed path=/ so you can be logged in to two Domoticz's at the same time on https://my.domoticz.com/.
 			sstr << "; HttpOnly; Expires=" << make_web_time(0);
 			reply::add_header(&rep, "Set-Cookie", sstr.str(), false);
@@ -1330,13 +1329,7 @@ namespace http {
 		std::string cWebemRequestHandler::generateSessionID()
 		{
 			// Session id should not be predictable
-			boost::uuids::random_generator gen;
-			std::stringstream ss;
-			std::string randomValue;
-
-			boost::uuids::uuid u = gen();
-			ss << u;
-			randomValue = ss.str();
+			std::string randomValue = GenerateUUID();
 
 			std::string sessionId = GenerateMD5Hash(base64_encode(randomValue));
 
@@ -1348,13 +1341,7 @@ namespace http {
 		std::string cWebemRequestHandler::generateAuthToken(const WebEmSession & session, const request & req)
 		{
 			// Authentication token should not be predictable
-			boost::uuids::random_generator gen;
-			std::stringstream ss;
-			std::string randomValue;
-
-			boost::uuids::uuid u = gen();
-			ss << u;
-			randomValue = ss.str();
+			std::string randomValue = GenerateUUID();
 
 			std::string authToken = base64_encode(randomValue);
 
@@ -1378,7 +1365,7 @@ namespace http {
 		void cWebemRequestHandler::send_cookie(reply& rep, const WebEmSession & session)
 		{
 			std::stringstream sstr;
-			sstr << "SID=" << session.id << "_" << session.auth_token << "." << session.expires;
+			sstr << "DMZSID=" << session.id << "_" << session.auth_token << "." << session.expires;
 			sstr << "; HttpOnly; path=/; Expires=" << make_web_time(session.expires);
 			reply::add_header(&rep, "Set-Cookie", sstr.str(), false);
 		}
@@ -1599,7 +1586,7 @@ namespace http {
 
 				// Parse session id and its expiration date
 				std::string scookie = cookie_header;
-				size_t fpos = scookie.find("SID=");
+				size_t fpos = scookie.find("DMZSID=");
 				if (fpos != std::string::npos)
 				{
 					scookie = scookie.substr(fpos);
@@ -1615,7 +1602,7 @@ namespace http {
 				time_t now = mytime(NULL);
 				if ((fpos != std::string::npos) && (upos != std::string::npos) && (ppos != std::string::npos))
 				{
-					sSID = scookie.substr(fpos + 4, upos - fpos - 4);
+					sSID = scookie.substr(fpos + 7, upos - fpos - 7);
 					sAuthToken = scookie.substr(upos + 1, ppos - upos - 1);
 					szTime = scookie.substr(ppos + 1);
 
@@ -1944,11 +1931,11 @@ namespace http {
 				if (cookie != NULL)
 				{
 					std::string scookie = cookie;
-					int fpos = scookie.find("SID=");
+					int fpos = scookie.find("DMZSID=");
 					int upos = scookie.find("_", fpos);
 					if ((fpos != std::string::npos) && (upos != std::string::npos))
 					{
-						std::string sSID = scookie.substr(fpos + 4, upos - fpos - 4);
+						std::string sSID = scookie.substr(fpos + 7, upos - fpos - 7);
 						_log.Debug(DEBUG_WEBSERVER, "Web: Logout : remove session %s", sSID.c_str());
 						std::map<std::string, WebEmSession>::iterator itt = myWebem->m_sessions.find(sSID);
 						if (itt != myWebem->m_sessions.end())
@@ -1962,6 +1949,8 @@ namespace http {
 				session.rights = -1;
 				session.forcelogin = true;
 				bCheckAuthentication = false; // do not authenticate the user, just logout
+				send_authorization_request(rep);
+				return;
 			}
 
 			// Check if this is an upgrade request to a websocket connection

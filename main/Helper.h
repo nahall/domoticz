@@ -16,6 +16,18 @@ void stdreplace(
 	const std::string& replaceWithWhat);
 void stdupper(std::string &inoutstring);
 void stdlower(std::string &inoutstring);
+
+template< typename T > inline
+std::string int_to_hex(T i)
+{
+	std::stringstream stream;
+	stream << "0x"
+		<< std::setfill('0') << std::setw(sizeof(T) * 2)
+		<< std::hex << i;
+	return stream.str();
+}
+
+
 bool file_exist (const char *filename);
 std::vector<std::string> GetSerialPorts(bool &bUseDirectPath);
 double CalculateAltitudeFromPressure(double pressure);
@@ -56,6 +68,8 @@ bool IsLightOrSwitch(const int devType, const int subType);
 
 int MStoBeaufort(const float ms);
 
+void FixFolderEnding(std::string &folder);
+
 struct dirent;
 bool dirent_is_directory(const std::string &dir, struct dirent *ent);
 bool dirent_is_file(const std::string &dir, struct dirent *ent);
@@ -75,3 +89,14 @@ bool IsArgumentSecure(const std::string &arg);
 uint32_t SystemUptime();
 int GenerateRandomNumber(const int range);
 int GetDirFilesRecursive(const std::string &DirPath, std::map<std::string, int> &_Files);
+
+int SetThreadName(const std::thread::native_handle_type &thread, const char *name);
+
+#if !defined(WIN32)
+	bool IsDebuggerPresent(void);
+#endif
+#if defined(__linux__)
+	bool IsWSL(void); //Detects if running under Windows Subsystem for Linux (WSL)
+#endif
+
+std::string GenerateUUID();

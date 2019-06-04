@@ -40,11 +40,12 @@ namespace OpenZWave
 	class Node;
 
 	/** \brief Byte value sent to/received from a node.
+	 * \ingroup ValueID
 	 */
 	class ValueByte: public Value
 	{
 	public:
-		ValueByte( uint32 const _homeId, uint8 const _nodeId, ValueID::ValueGenre const _genre, uint8 const _commandClassId, uint8 const _instance, uint8 const _index, string const& _label, string const& _units, bool const _readOnly, bool const _writeOnly, uint8 const _value, uint8 const _pollIntensity );
+		ValueByte( uint32 const _homeId, uint8 const _nodeId, ValueID::ValueGenre const _genre, uint8 const _commandClassId, uint8 const _instance, uint16 const _index, string const& _label, string const& _units, bool const _readOnly, bool const _writeOnly, uint8 const _value, uint8 const _pollIntensity );
 		ValueByte();
 		virtual ~ValueByte(){}
 
@@ -62,7 +63,6 @@ namespace OpenZWave
 	private:
 		uint8	m_value;				// the current value
 		uint8	m_valueCheck;			// the previous value (used for double-checking spurious value reads)
-		uint8	m_newValue;				// a new value to be set on the appropriate device
 	};
 
 } // namespace OpenZWave

@@ -40,11 +40,12 @@ namespace OpenZWave
 	class Node;
 
 	/** \brief A collection of bytes sent to/received from a node.
+	 * \ingroup ValueID
 	 */
 	class ValueRaw: public Value
 	{
 	public:
-		ValueRaw( uint32 const _homeId, uint8 const _nodeId, ValueID::ValueGenre const _genre, uint8 const _commandClassId, uint8 const _instance, uint8 const _index, string const& _label, string const& _units, bool const _readOnly, bool const _writeOnly, uint8 const* _value, uint8 const _length, uint8 const _pollIntensity );
+		ValueRaw( uint32 const _homeId, uint8 const _nodeId, ValueID::ValueGenre const _genre, uint8 const _commandClassId, uint8 const _instance, uint16 const _index, string const& _label, string const& _units, bool const _readOnly, bool const _writeOnly, uint8 const* _value, uint8 const _length, uint8 const _pollIntensity );
 		ValueRaw();
 		virtual ~ValueRaw();
 
@@ -64,7 +65,7 @@ namespace OpenZWave
 		uint8*	m_value;				// the current value
 		uint8	m_valueLength;				// fixed length for this instance
 		uint8*	m_valueCheck;				// the previous value (used for double-checking spurious value reads)
-		uint8*	m_newValue;				// a new value to be set on the appropriate device
+		uint8	m_valueCheckLength;			// m_valueCheck array length
 	};
 
 } // namespace OpenZWave

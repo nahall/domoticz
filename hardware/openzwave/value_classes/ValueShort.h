@@ -40,11 +40,12 @@ namespace OpenZWave
 	class Node;
 
 	/** \brief Short value sent to/received from a node.
+	 * \ingroup ValueID
 	 */
 	class ValueShort: public Value
 	{
 	public:
-	  	ValueShort( uint32 const _homeId, uint8 const _nodeId, ValueID::ValueGenre const _genre, uint8 const _commandClassId, uint8 const _instance, uint8 const _index, string const& _label, string const& _units, bool const _readOnly, bool const _writeOnly, int16 const _value, uint8 const _pollIntensity );
+	  	ValueShort( uint32 const _homeId, uint8 const _nodeId, ValueID::ValueGenre const _genre, uint8 const _commandClassId, uint8 const _instance, uint16 const _index, string const& _label, string const& _units, bool const _readOnly, bool const _writeOnly, int16 const _value, uint8 const _pollIntensity );
 		ValueShort();
 		virtual ~ValueShort(){}
 
@@ -62,7 +63,6 @@ namespace OpenZWave
 	private:
 		int16	m_value;				// the current value
 		int16	m_valueCheck;			// the previous value (used for double-checking spurious value reads)
-		int16	m_newValue;				// a new value to be set on the appropriate device
 	};
 
 } // namespace OpenZWave

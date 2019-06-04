@@ -33,7 +33,6 @@ ZWaveBase::ZWaveBase()
 	m_LastRemovedNode = -1;
 	m_ControllerCommandStartTime = 0;
 	m_bInitState = true;
-	m_stoprequested = false;
 }
 
 
@@ -43,8 +42,9 @@ ZWaveBase::~ZWaveBase(void)
 
 bool ZWaveBase::StartHardware()
 {
+	RequestStart();
+
 	m_bInitState=true;
-	m_stoprequested=false;
 	m_updateTime=0;
 	m_LastIncludedNode=0;
 	m_bControllerCommandInProgress=false;
@@ -53,6 +53,7 @@ bool ZWaveBase::StartHardware()
 
 	//Start worker thread
 	m_thread = std::make_shared<std::thread>(&ZWaveBase::Do_Work, this);
+	SetThreadName(m_thread->native_handle(), "ZWaveBase");
 	return (m_thread != nullptr);
 }
 
@@ -60,7 +61,7 @@ bool ZWaveBase::StopHardware()
 {
 	if (m_thread)
 	{
-		m_stoprequested = true;
+		RequestStop();
 		m_thread->join();
 		m_thread.reset();
 	}
@@ -76,11 +77,8 @@ void ZWaveBase::Do_Work()
 #endif
 	int msec_counter = 0;
 	int sec_counter = 0;
-	while (!m_stoprequested)
+	while (!IsStopRequested(500))
 	{
-		sleep_milliseconds(500);
-		if (m_stoprequested)
-			return;
 		msec_counter++;
 		if (msec_counter == 2)
 		{
@@ -371,8 +369,13 @@ void ZWaveBase::SendDevice2Domoticz(const _tZWaveDevice *pDevice)
 		int level = pDevice->intvalue;
 
 		// Simple on/off device, make sure we only have 0 or 255
-		if ((pDevice->devType == ZDTYPE_SWITCH_NORMAL)|| (pDevice->devType == ZDTYPE_CENTRAL_SCENE))
+		if (pDevice->devType == ZDTYPE_SWITCH_NORMAL)
 			level = (level == 0) ? 0 : 255;
+		else if (pDevice->devType == ZDTYPE_CENTRAL_SCENE)
+		{
+			level = 255;
+			gswitch.unitcode = pDevice->intvalue;
+		}
 
 		// Now check the values
 		if (level == 0)

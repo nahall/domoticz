@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.14.0)
 project(domoticz)
 
 ## required min. libBoost version
-SET(DOMO_MIN_LIBBOOST_VERSION 1.60.0)
+SET(DOMO_MIN_LIBBOOST_VERSION 1.66.0)
 ##
 
 MACRO(History_GET_REVISION variable)
@@ -250,7 +250,7 @@ MACRO(ADD_PRECOMPILED_HEADER _targetName _input)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
   ENDIF()
   IF(CMAKE_COMPILER_IS_GNUCXX)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wno-psabi")
     #SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-switch")
     #ADD_DEFINITIONS( -Wall -O0 -ggdb )
     #ADD_DEFINITIONS( -Wfatal-errors -Wformat=2 -Werror=format-security )
